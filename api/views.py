@@ -7,6 +7,7 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.http import HttpResponse
+from django.db.models import Sum
 from io import BytesIO
 import qrcode
 import random
@@ -91,7 +92,7 @@ def verify_code(request):
 @permission_classes([IsAuthenticated])
 def get_profile(request):
     profile = ParticipantProfile.objects.get(user=request.user)
-    total_hours = Participation.objects.filter(participant=profile, is_verified=True).aggregate(total=models.Sum('hours_claimed'))['total'] or 0
+    total_hours = Participation.objects.filter(participant=profile, is_verified=True).aggregate(total=Sum('hours_claimed'))['total'] or 0
     skills = ParticipantSkill.objects.filter(participant=profile, level__gt=0).select_related('skill')
     skills_data = [{'name': s.skill.name, 'level': s.level} for s in skills]
     events = Participation.objects.filter(participant=profile, is_verified=True).select_related('event')[:10]
