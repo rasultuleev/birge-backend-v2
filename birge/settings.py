@@ -85,11 +85,12 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
+
 # ---------- НАСТРОЙКИ ОТПРАВКИ ПИСЕМ (SMTP) ----------
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'birge.kgs@gmail.com'
-EMAIL_HOST_PASSWORD = 'gedkinaullbinidf'
-DEFAULT_FROM_EMAIL = 'birge.kgs@gmail.com'
+EMAIL_HOST = 'smtp.mail.ru'
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+EMAIL_HOST_USER = 'birge.kg@internet.ru'
+EMAIL_HOST_PASSWORD = 'ehS5mfQV6dNw5sZm6TEl'
+DEFAULT_FROM_EMAIL = 'birge.kg@internet.ru'
