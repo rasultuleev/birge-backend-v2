@@ -85,6 +85,11 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
+# ---------- НАСТРОЙКИ CORS ----------
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = ['*']
+CORS_ALLOW_METHODS = ['*']
 
 # ---------- НАСТРОЙКИ ОТПРАВКИ ПИСЕМ (SMTP) ----------
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
