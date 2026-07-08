@@ -16,23 +16,26 @@ from .models import (
     Participation, ParticipantSkill
 )
 
+def add_cors_headers(response):
+    response['Access-Control-Allow-Origin'] = '*'
+    response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, OPTIONS'
+    response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
+
 @api_view(['GET'])
 def health_check(request):
-    return Response({'status': 'ok', 'message': 'Birge API работает'})
+    response = Response({'status': 'ok', 'message': 'Birge API работает'})
+    return add_cors_headers(response)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def send_verification_code(request):
     email = request.data.get('email')
     if not email:
-        return Response({'error': 'Email обязателен'}, status=400)
+        return add_cors_headers(Response({'error': 'Email обязателен'}, status=400))
     code = f"{random.randint(100000, 999999)}"
     VerificationCode.objects.create(email=email, code=code)
-    
-    # Всегда печатаем код в логи (для отладки и пилота)
     print(f"📧 Код для {email}: {code}")
-    
-    # Отправляем письмо (если SMTP настроен, письмо уйдёт; если нет — будет ошибка, но логи останутся)
     send_mail(
         subject='Код подтверждения Birge',
         message=f'Ваш код: {code}',
@@ -40,7 +43,7 @@ def send_verification_code(request):
         recipient_list=[email],
         fail_silently=False,
     )
-    return Response({'message': 'Код отправлен на email'})
+    return add_cors_headers(Response({'message': 'Код отправлен на email'}))
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -52,9 +55,9 @@ def verify_code(request):
             email=email, code=code, is_used=False
         ).latest('created_at')
     except VerificationCode.DoesNotExist:
-        return Response({'error': 'Неверный или просроченный код'}, status=400)
+        return add_cors_headers(Response({'error': 'Неверный или просроченный код'}, status=400))
     if verification.is_expired():
-        return Response({'error': 'Код истёк'}, status=400)
+        return add_cors_headers(Response({'error': 'Код истёк'}, status=400))
     verification.is_used = True
     verification.save()
     user, created = User.objects.get_or_create(username=email, defaults={'email': email})
@@ -63,11 +66,11 @@ def verify_code(request):
         user.save()
         ParticipantProfile.objects.get_or_create(user=user, defaults={'group_name': 'Новая группа'})
     refresh = RefreshToken.for_user(user)
-    return Response({
+    return add_cors_headers(Response({
         'success': True,
         'access_token': str(refresh.access_token),
         'refresh_token': str(refresh),
-    })
+    }))
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -78,7 +81,7 @@ def get_profile(request):
     skills_data = [{'name': s.skill.name, 'level': s.level} for s in skills]
     events = Participation.objects.filter(participant=profile, is_verified=True).select_related('event')[:10]
     events_data = [{'title': p.event.title, 'hours': p.hours_claimed, 'date': p.verified_at} for p in events]
-    return Response({
+    return add_cors_headers(Response({
         'first_name': request.user.first_name,
         'last_name': request.user.last_name,
         'user_type': profile.user_type,
@@ -88,7 +91,7 @@ def get_profile(request):
         'skills': skills_data,
         'events': events_data,
         'is_staff': request.user.is_staff,
-    })
+    }))
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
@@ -108,19 +111,19 @@ def update_profile(request):
     if 'group_name' in data:
         profile.group_name = data['group_name']
     profile.save()
-    return Response({'message': 'Профиль обновлён'})
+    return add_cors_headers(Response({'message': 'Профиль обновлён'}))
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def skill_list(request):
     skills = Skill.objects.all()
-    return Response([{'id': s.id, 'name': s.name, 'category': s.category} for s in skills])
+    return add_cors_headers(Response([{'id': s.id, 'name': s.name, 'category': s.category} for s in skills]))
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_event(request):
     if not request.user.is_staff:
-        return Response({'error': 'Доступ только для организаторов'}, status=403)
+        return add_cors_headers(Response({'error': 'Доступ только для организаторов'}, status=403))
     data = request.data
     event = Event.objects.create(
         title=data['title'],
@@ -134,13 +137,13 @@ def create_event(request):
     )
     if 'skill_ids' in data:
         event.skills.set(data['skill_ids'])
-    return Response({'message': 'Мероприятие создано', 'event_id': event.id, 'code': event.code})
+    return add_cors_headers(Response({'message': 'Мероприятие создано', 'event_id': event.id, 'code': event.code}))
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_events(request):
     if not request.user.is_staff:
-        return Response({'error': 'Доступ только для организаторов'}, status=403)
+        return add_cors_headers(Response({'error': 'Доступ только для организаторов'}, status=403))
     events = Event.objects.filter(organizer=request.user)
     data = [{
         'id': e.id,
@@ -152,7 +155,7 @@ def my_events(request):
         'status': e.status,
         'skills': [s.name for s in e.skills.all()]
     } for e in events]
-    return Response(data)
+    return add_cors_headers(Response(data))
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -160,13 +163,15 @@ def event_qr(request, code):
     try:
         event = Event.objects.get(code=code, status='active')
     except Event.DoesNotExist:
-        return Response({'error': 'Мероприятие не найдено'}, status=404)
+        return add_cors_headers(Response({'error': 'Мероприятие не найдено'}, status=404))
     if request.user != event.organizer and not request.user.is_superuser:
-        return Response({'error': 'Доступ запрещён'}, status=403)
+        return add_cors_headers(Response({'error': 'Доступ запрещён'}, status=403))
     img = qrcode.make(event.code)
     buffer = BytesIO()
     img.save(buffer, format="PNG")
-    return HttpResponse(buffer.getvalue(), content_type="image/png")
+    response = HttpResponse(buffer.getvalue(), content_type="image/png")
+    response['Access-Control-Allow-Origin'] = '*'
+    return response
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -174,7 +179,7 @@ def event_participants(request, event_id):
     try:
         event = Event.objects.get(id=event_id, organizer=request.user)
     except Event.DoesNotExist:
-        return Response({'error': 'Мероприятие не найдено или доступ запрещён'}, status=404)
+        return add_cors_headers(Response({'error': 'Мероприятие не найдено или доступ запрещён'}, status=404))
     participations = Participation.objects.filter(event=event).select_related('participant__user')
     data = [{
         'id': p.id,
@@ -186,7 +191,7 @@ def event_participants(request, event_id):
         'verified': p.is_verified,
         'registered_at': p.registered_at
     } for p in participations]
-    return Response(data)
+    return add_cors_headers(Response(data))
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -194,9 +199,9 @@ def verify_participation(request, participation_id):
     try:
         participation = Participation.objects.get(id=participation_id)
         if participation.event.organizer != request.user:
-            return Response({'error': 'Доступ запрещён'}, status=403)
+            return add_cors_headers(Response({'error': 'Доступ запрещён'}, status=403))
     except Participation.DoesNotExist:
-        return Response({'error': 'Участие не найдено'}, status=404)
+        return add_cors_headers(Response({'error': 'Участие не найдено'}, status=404))
     participation.is_verified = True
     participation.verified_at = timezone.now()
     participation.verified_by = request.user
@@ -207,7 +212,7 @@ def verify_participation(request, participation_id):
         count = Participation.objects.filter(participant=participant, event__skills=skill, is_verified=True).count()
         ps.level = min(count, 3)
         ps.save()
-    return Response({'message': 'Часы подтверждены'})
+    return add_cors_headers(Response({'message': 'Часы подтверждены'}))
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -217,11 +222,11 @@ def register_event_by_code(request):
     try:
         event = Event.objects.get(code=code, status='active')
     except Event.DoesNotExist:
-        return Response({'error': 'Мероприятие не найдено'}, status=404)
+        return add_cors_headers(Response({'error': 'Мероприятие не найдено'}, status=404))
     profile = ParticipantProfile.objects.get(user=request.user)
     if hours > event.max_hours:
-        return Response({'error': f'Максимум {event.max_hours} часов'}, status=400)
+        return add_cors_headers(Response({'error': f'Максимум {event.max_hours} часов'}, status=400))
     participation, created = Participation.objects.get_or_create(participant=profile, event=event, defaults={'hours_claimed': hours})
     if not created:
-        return Response({'error': 'Вы уже зарегистрированы'}, status=400)
-    return Response({'message': 'Регистрация успешна. Ожидайте подтверждения.'})
+        return add_cors_headers(Response({'error': 'Вы уже зарегистрированы'}, status=400))
+    return add_cors_headers(Response({'message': 'Регистрация успешна. Ожидайте подтверждения.'}))
