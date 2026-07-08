@@ -16,13 +16,9 @@ from .models import (
     Participation, ParticipantSkill
 )
 
-# ---------- ОБЩИЕ ----------
-
 @api_view(['GET'])
 def health_check(request):
     return Response({'status': 'ok', 'message': 'Birge API работает'})
-
-# ---------- ВЕРИФИКАЦИЯ ПО EMAIL ----------
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -30,14 +26,8 @@ def send_verification_code(request):
     email = request.data.get('email')
     if not email:
         return Response({'error': 'Email обязателен'}, status=400)
-
-    # Генерируем 6-значный код
     code = f"{random.randint(100000, 999999)}"
-
-    # Сохраняем в БД
     VerificationCode.objects.create(email=email, code=code)
-
-    # Отправляем письмо (в DEBUG выводим в консоль)
     if settings.DEBUG:
         print(f"📧 Код для {email}: {code}")
     else:
@@ -48,7 +38,6 @@ def send_verification_code(request):
             recipient_list=[email],
             fail_silently=False,
         )
-
     return Response({'message': 'Код отправлен на email'})
 
 @api_view(['POST'])
@@ -56,37 +45,27 @@ def send_verification_code(request):
 def verify_code(request):
     email = request.data.get('email')
     code = request.data.get('code')
-
     try:
         verification = VerificationCode.objects.filter(
-            email=email,
-            code=code,
-            is_used=False
+            email=email, code=code, is_used=False
         ).latest('created_at')
     except VerificationCode.DoesNotExist:
         return Response({'error': 'Неверный или просроченный код'}, status=400)
-
     if verification.is_expired():
         return Response({'error': 'Код истёк'}, status=400)
-
     verification.is_used = True
     verification.save()
-
-    # Создаём или находим пользователя
     user, created = User.objects.get_or_create(username=email, defaults={'email': email})
     if created:
         user.set_unusable_password()
         user.save()
         ParticipantProfile.objects.get_or_create(user=user, defaults={'group_name': 'Новая группа'})
-
     refresh = RefreshToken.for_user(user)
     return Response({
         'success': True,
         'access_token': str(refresh.access_token),
         'refresh_token': str(refresh),
     })
-
-# ---------- ПРОФИЛЬ УЧАСТНИКА ----------
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -97,7 +76,6 @@ def get_profile(request):
     skills_data = [{'name': s.skill.name, 'level': s.level} for s in skills]
     events = Participation.objects.filter(participant=profile, is_verified=True).select_related('event')[:10]
     events_data = [{'title': p.event.title, 'hours': p.hours_claimed, 'date': p.verified_at} for p in events]
-
     return Response({
         'first_name': request.user.first_name,
         'last_name': request.user.last_name,
@@ -116,13 +94,11 @@ def update_profile(request):
     user = request.user
     profile = ParticipantProfile.objects.get(user=user)
     data = request.data
-
     if 'first_name' in data:
         user.first_name = data['first_name']
     if 'last_name' in data:
         user.last_name = data['last_name']
     user.save()
-
     if 'user_type' in data:
         profile.user_type = data['user_type']
     if 'institution' in data:
@@ -130,18 +106,13 @@ def update_profile(request):
     if 'group_name' in data:
         profile.group_name = data['group_name']
     profile.save()
-
     return Response({'message': 'Профиль обновлён'})
-
-# ---------- НАВЫКИ ----------
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def skill_list(request):
     skills = Skill.objects.all()
     return Response([{'id': s.id, 'name': s.name, 'category': s.category} for s in skills])
-
-# ---------- ОРГАНИЗАТОР ----------
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -224,20 +195,16 @@ def verify_participation(request, participation_id):
             return Response({'error': 'Доступ запрещён'}, status=403)
     except Participation.DoesNotExist:
         return Response({'error': 'Участие не найдено'}, status=404)
-
     participation.is_verified = True
     participation.verified_at = timezone.now()
     participation.verified_by = request.user
     participation.save()
-
-    # Обновляем навыки участника
     participant = participation.participant
     for skill in participation.event.skills.all():
         ps, created = ParticipantSkill.objects.get_or_create(participant=participant, skill=skill)
         count = Participation.objects.filter(participant=participant, event__skills=skill, is_verified=True).count()
         ps.level = min(count, 3)
         ps.save()
-
     return Response({'message': 'Часы подтверждены'})
 
 @api_view(['POST'])
