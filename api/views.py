@@ -28,16 +28,18 @@ def send_verification_code(request):
         return Response({'error': 'Email обязателен'}, status=400)
     code = f"{random.randint(100000, 999999)}"
     VerificationCode.objects.create(email=email, code=code)
-    if settings.DEBUG:
-        print(f"📧 Код для {email}: {code}")
-    else:
-        send_mail(
-            subject='Код подтверждения Birge',
-            message=f'Ваш код: {code}',
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-            fail_silently=False,
-        )
+    
+    # Всегда печатаем код в логи (для отладки и пилота)
+    print(f"📧 Код для {email}: {code}")
+    
+    # Отправляем письмо (если SMTP настроен, письмо уйдёт; если нет — будет ошибка, но логи останутся)
+    send_mail(
+        subject='Код подтверждения Birge',
+        message=f'Ваш код: {code}',
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=False,
+    )
     return Response({'message': 'Код отправлен на email'})
 
 @api_view(['POST'])
