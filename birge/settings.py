@@ -21,6 +21,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'birge.cors_middleware.ForceCorsMiddleware',
     'corsheaders.middleware.CorsMiddleware',          # Первая строка!
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
